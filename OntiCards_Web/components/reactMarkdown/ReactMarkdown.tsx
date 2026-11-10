@@ -2,10 +2,24 @@ import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import katex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import gfm from 'remark-gfm'
 import math from 'remark-math'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import styles from './ReactMarkdown.module.scss'
+
+// 允许 rehypeRaw 输出的极少数安全的 HTML 标签（用于 KaTeX + 业务需要），
+// 严格禁止 <script>、事件属性、javascript: 等危险注入。
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'className', 'style', 'id'],
+    code: [...(defaultSchema.attributes?.code ?? []), 'className'],
+    pre: [...(defaultSchema.attributes?.pre ?? []), 'className'],
+  },
+  tagNames: [...(defaultSchema.tagNames ?? []), 'details', 'summary', 'kbd'],
+}
 
 interface ReactMarkdownsProps {
   content?: string;
@@ -58,7 +72,7 @@ export default function ReactMarkdowns({ content, className, fontSize }: ReactMa
       }}
       className={`${styles.container} ${className || ''}`}
       remarkPlugins={[gfm, math]}
-      rehypePlugins={[rehypeRaw, katex]}
+      rehypePlugins={[rehypeRaw, katex, [rehypeSanitize, sanitizeSchema]]}
     >
       {String(content)}
     </ReactMarkdown>
