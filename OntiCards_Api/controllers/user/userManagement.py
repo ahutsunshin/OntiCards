@@ -301,6 +301,7 @@ def ensure_upload_folder():
 
 
 class UploadAvatarAPI(Resource):
+    @login_required
     def post(self):
         try:
             # 确保上传目录存在
@@ -310,6 +311,14 @@ class UploadAvatarAPI(Resource):
 
         file = request.files.get('file')
         user_id = request.form.get('user_id')
+
+        # 权限校验：普通用户只能改自己的头像；admin 可改任意用户
+        current = flask_login.current_user
+        if not current.is_authenticated:
+            return {'message': 'Authentication required', 'code': 401}, 401
+        if user_id and str(current.id) != str(user_id) and current.role != 'admin':
+            return {'message': 'Permission denied', 'code': 403}, 403
+
         if file:
             safe_name = _safe_filename(file.filename)
             if not safe_name:
@@ -325,7 +334,9 @@ class UploadAvatarAPI(Resource):
             return {'message': 'No file selected', 'code': 400}
 
         if file and allowed_file(file.filename):
-            user = User.query.filter_by(id=user_id).first()
+            # 普通用户回退到 current_user.id
+            target_user_id = user_id if current.role == 'admin' else str(current.id)
+            user = User.query.filter_by(id=target_user_id).first()
             if not user:
                 return {'message': 'User does not exist', 'code': 404}
 
@@ -350,6 +361,7 @@ class UploadAvatarAPI(Resource):
         else:
             return {'message': 'Unsupported file format', 'code': 400}
 
+    @login_required
     def put(self):
         try:
             # 确保上传目录存在
@@ -359,6 +371,12 @@ class UploadAvatarAPI(Resource):
 
         file = request.files.get('file')
         user_id = request.form.get('user_id')
+
+        current = flask_login.current_user
+        if not current.is_authenticated:
+            return {'message': 'Authentication required', 'code': 401}, 401
+        if user_id and str(current.id) != str(user_id) and current.role != 'admin':
+            return {'message': 'Permission denied', 'code': 403}, 403
         if file:
             safe_name = _safe_filename(file.filename)
             if not safe_name:
@@ -376,7 +394,8 @@ class UploadAvatarAPI(Resource):
         if not allowed_file(file.filename):
             return {'message': 'Unsupported file format', 'code': 400}
 
-        user = User.query.filter_by(id=user_id).first()
+        target_user_id = user_id if flask_login.current_user.role == 'admin' else str(flask_login.current_user.id)
+        user = User.query.filter_by(id=target_user_id).first()
         if not user:
             return {'message': 'User does not exist', 'code': 404}
 
